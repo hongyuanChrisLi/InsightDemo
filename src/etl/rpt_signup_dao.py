@@ -19,6 +19,7 @@ class RptSignupDao (RptAbstrDao):
 
     def __base_table__(self):
 
+        # SELECT needed columns
         # (PROGRAM_ID, CALENDAR_SEASON_ID, AUDIT_OPERATION_ID, USER_ID)
         df_aud = self.df_fa \
             .select(const.PROGRAM_ID,
@@ -26,15 +27,16 @@ class RptSignupDao (RptAbstrDao):
                     const.CALENDAR_SEASON_ID,
                     const.AUDIT_OPERATION_ID,
                     const.INTERVIEW_EVENT_ID,
-                    const.USER_ID) \
-            .repartition(const.PROGRAM_ID)
+                    const.USER_ID)
 
+        # dataframe of invite operations
         # (PROGRAM_ID, CALENDAR_SEASON_ID, CREATED_DATE, USER_ID)
         df_invite = df_aud\
             .where(df_aud[const.AUDIT_OPERATION_ID] == const.INVITE_OPERATION)\
             .drop(const.AUDIT_OPERATION_ID)\
             .drop(const.INTERVIEW_EVENT_ID)
 
+        # data frame of signup interview operations
         # (PROGRAM_ID, CALENDAR_SEASON_ID, INTERVIEW_EVENT_ID, SCHEDULE_DATE, USER_ID)
         df_schdl_loc = df_aud \
             .filter(df_aud[const.AUDIT_OPERATION_ID] == const.SIGNUP_INTERVIEW_OPERATION) \
@@ -45,6 +47,7 @@ class RptSignupDao (RptAbstrDao):
                         const.CREATED_DATE + " as " + SCHEDULE_DATE,
                         const.USER_ID)
 
+        # dataframe of sigup waitlist operations
         # (USER_ID, WAITLIST_DATE, INTERVIEW_EVENT_ID)
         df_waitlist = df_aud\
             .filter(const.AUDIT_OPERATION_ID + " = " + str(const.SIGNUP_WAITLIST_OPERATION)
@@ -54,10 +57,11 @@ class RptSignupDao (RptAbstrDao):
                         const.INTERVIEW_EVENT_ID,
                         const.CREATED_DATE + " as " + WAITLIST_DATE)
 
-
+        # join condition for interview signup and waitlist signup
         condi = [df_schdl_loc[const.USER_ID] == df_waitlist[const.USER_ID],
                  df_schdl_loc[const.INTERVIEW_EVENT_ID] == df_waitlist[const.INTERVIEW_EVENT_ID]]
 
+        # dataframe for those first operation is signing up interviews
         # (PROGRAM_ID, CALENDAR_SEASON_ID, USER_ID, SCHEDULE_DATE)
         df_schedule = df_schdl_loc.join(df_waitlist, condi, const.INNER)\
             .drop(df_waitlist[const.USER_ID])\
@@ -66,12 +70,12 @@ class RptSignupDao (RptAbstrDao):
             .filter(WAITLIST_DATE + " IS NULL OR " + WAITLIST_DATE + " > " +  SCHEDULE_DATE)\
             .drop(WAITLIST_DATE)
 
-
-
+        # join conidtion for df_join
         condi = [df_invite[const.USER_ID] == df_schedule[const.USER_ID],
                  df_invite[const.PROGRAM_ID] == df_schedule[const.PROGRAM_ID],
                  df_invite[const.CALENDAR_SEASON_ID] == df_schedule[const.CALENDAR_SEASON_ID]]
 
+        # dataframe shows how much time it takes for each individual to sign up for an interview
         # (PROGRAM_ID, CALENDAR_SEASON_ID, USER_ID, SIGNUP_TIME)
         df_join = df_invite.join(df_schedule, condi, const.INNER) \
             .drop(df_invite[const.USER_ID]) \

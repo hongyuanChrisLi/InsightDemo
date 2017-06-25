@@ -52,10 +52,16 @@ class RptProgramAuditDao(RptAbstrDao):
 
         # invite
         # (PROGRAM_ID, SPECIALTY_ID, CALENDAR_SEASON_ID,CREATED_DATE)
-        self.df_invite = self.df_pa\
-            .where(self.df_pa[const.AUDIT_OPERATION_ID] == const.INVITE_OPERATION)\
-            .drop(const.AUDIT_OPERATION_ID)\
-            .withColumn(const.CREATED_DATE, self.df_pa[const.CREATED_DATE].cast('date'))
+        # Repartition for Join
+        # Cache to avoid repeated select
+        self.df_invite =  self.df_fa \
+            .selectExpr(const.PROGRAM_ID,
+                        const.CALENDAR_SEASON_ID,
+                        "cast (" + const.CREATED_DATE + " AS date) AS CREATED_DATE ")\
+            .filter(const.AUDIT_OPERATION_ID + " = " + str(const.INVITE_OPERATION)) \
+            .repartition(const.PARTS, [const.PROGRAM_ID, const.CALENDAR_SEASON_ID])\
+            .sortWithinPartitions([const.PROGRAM_ID, const.CALENDAR_SEASON_ID,const.CREATED_DATE])\
+            .cache()
 
         # withdraw
         # (PROGRAM_ID, SPECIALTY_ID, CALENDAR_SEASON_ID,CREATED_DATE)
@@ -70,7 +76,13 @@ class RptProgramAuditDao(RptAbstrDao):
             .drop(const.AUDIT_OPERATION_ID)
 
 
-    """ Base Columns """
+    """ 
+    
+    Base Columns Calculation
+        Results are calculated from aggregation functions
+    
+    """
+
 
     def __cal_total_slots__(self):
         # tsp: total slots of program
@@ -78,13 +90,6 @@ class RptProgramAuditDao(RptAbstrDao):
         self.df_tsp = self.df_tts\
             .groupBy([const.PROGRAM_ID, const.CALENDAR_SEASON_ID]) \
             .agg(sf.sum(const.ALL_TIER_QUANTITY).alias(TOTAL_SLOTS))
-
-        # tss: total slots of specialty
-        self.df_tss = self.df_tsp\
-            .join(self.df_prg, const.PROGRAM_ID, const.INNER)\
-            .drop(const.PROGRAM_ID)\
-            .groupBy([const.SPECIALTY_ID,const.CALENDAR_SEASON_ID])\
-            .agg(sf.sum(TOTAL_SLOTS).alias(TOTAL_SLOTS))
 
     def __cal_total_invites__(self):
 
@@ -97,12 +102,6 @@ class RptProgramAuditDao(RptAbstrDao):
             .groupBy([const.PROGRAM_ID, const.CALENDAR_SEASON_ID])\
             .agg(sf.count(const.CREATED_DATE).alias(TOTAL_INVITES))
 
-        # tis: total invites of a specialty
-        # (SPECIALTY_ID, CALENDAR_SEASON_ID,TOTAL_INVITES)
-        self.df_tis = self.df_invite\
-            .drop(const.PROGRAM_ID)\
-            .groupBy([const.SPECIALTY_ID, const.CALENDAR_SEASON_ID])\
-            .agg(sf.count(const.CREATED_DATE).alias(TOTAL_INVITES))
 
     def __cal_total_withdraw__(self):
 
@@ -113,11 +112,6 @@ class RptProgramAuditDao(RptAbstrDao):
             .groupBy([const.PROGRAM_ID, const.CALENDAR_SEASON_ID])\
             .agg(sf.count(const.CREATED_DATE).alias(TOTAL_WITHDRAW))
 
-        # tws: total withdraw of a specialty
-        self.df_tws = self.df_withdraw\
-            .drop(const.PROGRAM_ID)\
-            .groupBy([const.SPECIALTY_ID, const.CALENDAR_SEASON_ID])\
-            .agg(sf.count(const.CREATED_DATE).alias(TOTAL_WITHDRAW))
 
     def __cal_total_cancel__(self):
 
@@ -131,52 +125,32 @@ class RptProgramAuditDao(RptAbstrDao):
 
         # fidp: first invite day of program
         # (PROGRAM_ID, CALENDAR_SEASON_ID,FIRST_DATE)
-        self.df_fidp = self.df_invite\
-            .drop(const.SPECIALTY_ID)\
-            .groupBy([const.PROGRAM_ID, const.CALENDAR_SEASON_ID])\
-            .agg(sf.min(const.CREATED_DATE).alias(FIRST_INVITE_DAY))
-
-        # fids: first invite day of specialty
-        # (SPECIALTY_ID, CALENDAR_SEASON_ID,FIRST_DATE)
-        self.df_fids = self.df_invite \
-            .drop(const.PROGRAM_ID) \
-            .groupBy([const.SPECIALTY_ID, const.CALENDAR_SEASON_ID]) \
-            .agg(sf.min(const.CREATED_DATE).alias(FIRST_INVITE_DAY))
-
+        self.df_fidp = self.df_invite \
+            .groupBy([const.PROGRAM_ID, const.CALENDAR_SEASON_ID]) \
+            .agg(sf.min(const.CREATED_DATE).alias(FIRST_INVITE_DAY)) \
+            .persist()
 
     def __cal_first_date_invites__(self):
 
+        # program join condition
         prg_condi = [self.df_invite[const.PROGRAM_ID] == self.df_fidp[const.PROGRAM_ID],
-                 self.df_invite[const.CALENDAR_SEASON_ID] == self.df_fidp[const.CALENDAR_SEASON_ID],
-                 self.df_invite[const.CREATED_DATE] == self.df_fidp[FIRST_INVITE_DAY]]
+                     self.df_invite[const.CALENDAR_SEASON_ID] == self.df_fidp[const.CALENDAR_SEASON_ID],
+                     self.df_invite[const.CREATED_DATE] == self.df_fidp[FIRST_INVITE_DAY]]
+
 
         # tfdip: first date invites of program
         # (PROGRAM_ID, CALENDAR_SEASON_ID,FIRST_DATE_INVITES)
-        self.df_tfdip = self.df_invite\
-            .drop(const.SPECIALTY_ID)\
-            .join(self.df_fidp, prg_condi, const.INNER)\
-            .drop(self.df_fidp[const.PROGRAM_ID])\
-            .drop(self.df_fidp[const.CALENDAR_SEASON_ID])\
-            .drop(self.df_invite[const.CREATED_DATE])\
-            .groupBy([const.PROGRAM_ID, const.CALENDAR_SEASON_ID])\
+        self.df_tfdip = self.df_invite \
+            .join(self.df_fidp, prg_condi, const.INNER) \
+            .select(self.df_invite[const.PROGRAM_ID],
+                    self.df_invite[const.CALENDAR_SEASON_ID],
+                    self.df_fidp[FIRST_INVITE_DAY]) \
+            .groupBy([const.PROGRAM_ID, const.CALENDAR_SEASON_ID]) \
             .agg(sf.count(FIRST_INVITE_DAY).alias(TOTAL_FIRST_DAY_INVITES))
-
-        # (CALENDAR_SEASON_ID,CREATED_DATE, SPECIALTY_ID)
-        spcl_condi = [self.df_invite[const.SPECIALTY_ID] == self.df_fids[const.SPECIALTY_ID],
-                      self.df_invite[const.CALENDAR_SEASON_ID] == self.df_fids[const.CALENDAR_SEASON_ID],
-                      self.df_invite[const.CREATED_DATE] == self.df_fids[FIRST_INVITE_DAY]]
-
-        self.df_tfdis = self.df_invite\
-            .drop(const.PROGRAM_ID)\
-            .join(self.df_fids, spcl_condi, const.INNER)\
-            .drop(self.df_fids[const.SPECIALTY_ID])\
-            .drop(self.df_fids[const.CALENDAR_SEASON_ID])\
-            .drop(self.df_invite[const.CREATED_DATE]) \
-            .groupBy([const.SPECIALTY_ID, const.CALENDAR_SEASON_ID])\
-            .agg(sf.count(FIRST_INVITE_DAY).alias(TOTAL_FIRST_DAY_INVITES))
-
 
     def __base_table__(self):
+
+        # Join base columns
         self.__cal_total_slots__()
         self.__cal_total_invites__()
         self.__cal_total_withdraw__()
@@ -203,7 +177,12 @@ class RptProgramAuditDao(RptAbstrDao):
                         FIRST_INVITE_DAY,
                         self.__nvl__(TOTAL_FIRST_DAY_INVITES))
 
-    """ Derived Columns """
+    """ 
+    
+    Derived Columns 
+        Results are derived from base columns
+    
+    """
 
     def __full_table__(self):
 
@@ -211,7 +190,7 @@ class RptProgramAuditDao(RptAbstrDao):
         expr_top = TOTAL_INVITES + " - " + TOTAL_SLOTS + " - " + TOTAL_WITHDRAW
 
         # tor : total overage rate (program)
-        expr_tor = "round(" + TOTAL_INVITES + " / " + TOTAL_SLOTS + ", 2)"
+        expr_tor = self.__round_div__(TOTAL_INVITES, TOTAL_SLOTS, TOTAL_OVERAGE_RATE)
 
         # tiafd: total invites after first day (program)
         expr_tiafd = TOTAL_INVITES + " - " + TOTAL_FIRST_DAY_INVITES
@@ -220,19 +199,19 @@ class RptProgramAuditDao(RptAbstrDao):
         expr_fdo = TOTAL_FIRST_DAY_INVITES + " - " + TOTAL_SLOTS
 
         # fdor: first day overage ratio (program)
-        expr_fdor = "round(" + TOTAL_FIRST_DAY_INVITES + "/" + TOTAL_SLOTS + ", 2)"
+        expr_fdor = self.__round_div__(TOTAL_FIRST_DAY_INVITES,  TOTAL_SLOTS, FIRST_DAY_OVERAGE_RATE)
 
         # afdo: after first day overage (program)
         expr_afdo = expr_tiafd + " - " + TOTAL_SLOTS
 
         # afdopr: after first day overage rate (program)
-        expr_afdor = "round((" + expr_tiafd + ")/" + TOTAL_SLOTS + ", 2)"
+        expr_afdor = self.__round_div__(expr_tiafd, TOTAL_SLOTS, AFTER_FIRST_DAY_OVERAGE_RATE)
 
         # pifd: percent invites first day (program)
-        expr_pifd = "round(" + TOTAL_FIRST_DAY_INVITES + " * 100 / " + TOTAL_INVITES + ", 1)"
+        expr_pifd = self.__percent__(TOTAL_FIRST_DAY_INVITES, TOTAL_INVITES,PERCENT_INVITES_FIRST_DAY)
 
         # piafd: percent invites after first day
-        expr_piafd = "round((" + expr_tiafd + ") * 100 / " + TOTAL_INVITES + ", 1)"
+        expr_piafd = self.__percent__(expr_tiafd,  TOTAL_INVITES, PERCENT_INVITES_AFTER_FIRST_DAY)
 
         # pia: percent interview accepted
         expr_pia = "round((" + TOTAL_INVITES + " - " + TOTAL_WITHDRAW + " - " + TOTAL_CANCEL + ") * 100 / " \
@@ -249,14 +228,14 @@ class RptProgramAuditDao(RptAbstrDao):
             TOTAL_FIRST_DAY_INVITES,
             expr_tiafd + " as " + TOTAL_INVITES_AFTER_FIRST_DAY,
             expr_top + " as " + TOTAL_OVERAGE,
-            expr_tor + " as " + TOTAL_OVERAGE_RATE,
+            expr_tor,
             FIRST_INVITE_DAY,
             expr_fdo + " as " + FIRST_DAY_OVERAGE,
-            expr_fdor + " as " + FIRST_DAY_OVERAGE_RATE,
+            expr_fdor,
             expr_afdo + " as " + AFTER_FIRST_DAY_OVERAGE,
-            expr_afdor + " as " + AFTER_FIRST_DAY_OVERAGE_RATE,
-            expr_pifd + " as " + PERCENT_INVITES_FIRST_DAY,
-            expr_piafd + " as " + PERCENT_INVITES_AFTER_FIRST_DAY,
+            expr_afdor,
+            expr_pifd,
+            expr_piafd,
             expr_pia + " as " + PERCENT_INTERVIEWS_ACCEPTED)
 
         self.__write_df__(self.df_full, const.TARPT_PROGRAM_AUDIT_RPT)

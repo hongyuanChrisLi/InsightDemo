@@ -22,7 +22,8 @@ PERCENT_WAITLISTED_TO_WITHDRAWN = 'percent_waitlisted_to_withdrawn'
 class RptWaitlistDao(RptAbstrDao):
 
     """
-    This class populate the waitlist_rpt table
+    This class populate the waitlist_rpt table.
+    Purpose: find out how many waitlisted candidates are converted to other statuses
     """
 
 
