@@ -1,11 +1,12 @@
 # Thalamus-Analytics
 
-Thalamus Analytics serves as the central platform to measure the service efficienty of ThalamusGME. 
+Thalamus Analytics is my consulting project in Insight Data Science for ThalamusGME.
+
+***Note: This public reposiotry only contains a few source code samples. You can find them in [src/etl](src/etl) and [src/cnx](src/cnx) directories***
 
 * [1. Data Pipeline](README.md#Data-Pipeline)
 * [2. System Setup and Configuration](README.md#System-Setup-and-Configuration)
 * [3. Repository Structure](README.md#Repository-Structure)
-* [4. Tests](READMEN.md#Tests)
 
 
 # Data Pipeline
@@ -95,4 +96,3 @@ pip install flask-restful
 
 # Repository Structure
 
-# Tests
