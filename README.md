@@ -90,8 +90,4 @@ We use [Flask to generate Restful APIs.](https://flask-restful.readthedocs.io/)
 ```bash
 pip install flask-restful
 ```
-### Amazon QuickSight
-
-
-# Repository Structure
 
