@@ -1,3 +1,5 @@
+import logging
+
 from src.cnx.spark_redshift_cnx import SparkRedshiftCnx
 from src.utility import constants as const
 
@@ -9,10 +11,12 @@ class RptAbstrDao(SparkRedshiftCnx):
     """
     def __init__(self):
         super(RptAbstrDao, self).__init__()
+        self.logger = logging.getLogger(const.TA_ROOT_LOGGER)
 
         # full audit dim
         # (PROGRAM_ID, CALENDAR_SEASON_ID, CREATED_BY_USER_ID,
         # AUDIT_OPERATION_ID, INTERVIEW_EVENT_ID, CREATED_DATE)
+
         self.df_fa = self.__read_dist_sort_df__(const.TADW_AUDIT_DIM,const.PROGRAM_ID,
                                            [const.PROGRAM_ID, const.CALENDAR_SEASON_ID, const.CREATED_DATE])\
             .select(const.PROGRAM_ID,
@@ -24,6 +28,13 @@ class RptAbstrDao(SparkRedshiftCnx):
                     const.USER_ID,
                     const.APPLICATION_ID)
 
+    def log_completion(self, name):
+        """
+        log task completion
+        :param name: name of the object
+        :return: N/A
+        """
+        self.logger.info("Task Completed: " + name)
 
     @staticmethod
     def __get_join_condi__(df_a, df_b):
@@ -54,7 +65,7 @@ class RptAbstrDao(SparkRedshiftCnx):
         :param col_denom: Column as denominator
         :param col_name:  Final column name
         :param scale: Scale of the division result
-        :return:
+        :return: N/A
         """
         return "round(" + col_numer + " / " + col_denom + "," + str(scale) + ") AS " + col_name
 
@@ -66,6 +77,6 @@ class RptAbstrDao(SparkRedshiftCnx):
         :param col_denom:  Column as denominator
         :param col_name: Finale Column Name
         :param scale: Scale of the percentage result
-        :return:
+        :return: N/A
         """
         return "round((" + col_numer + ") * 100 / " + col_denom + "," + str(scale) + ") AS " + col_name
