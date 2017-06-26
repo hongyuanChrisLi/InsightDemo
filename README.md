@@ -2,11 +2,10 @@
 
 Thalamus Analytics is my consulting project in Insight Data Science for ThalamusGME.
 
-***Note: This public reposiotry only contains a few source code samples. You can find them in [src/etl](src/etl) and [src/cnx](src/cnx) directories***
+***Note: This public reposiotry only contains a few source code samples. These code snippets highlight the use of pyspark dataframe. You can find them in [src/etl](src/etl) and [src/cnx](src/cnx) directories***
 
 * [1. Data Pipeline](README.md#Data-Pipeline)
 * [2. System Setup and Configuration](README.md#System-Setup-and-Configuration)
-* [3. Repository Structure](README.md#Repository-Structure)
 
 
 # Data Pipeline
@@ -17,17 +16,17 @@ Thalamus Analytics is my consulting project in Insight Data Science for Thalamus
 
 The data pipeline starts with Azure SQL server database, where ThalamusGME's operational data resides. A light weight ODBC/JDBC connector (single node & serial) in this project transfer data from Azure SQL server to Amazon Redshift, our data warehouse. In Redshift, there are three schemas TASTG, TADW, and TARPT: 
 
-**TASTG**: Staging tables are created in this schema. When tables are migrated from Azure SQL to Redshift, mirroring tables are created in TASTG and all data transfered. Some nvarhcar and text columns are truncated to size 1000 to moderately reduce data size. Binary columns are not supported in Redshift, thus not migrated. There are two types of data load on staging tables, intial load and incremental load. In this project, data is loaded as inital load, which means full table copy. Under current condition(06/19/2017) with relatively small data size, intial load from all tables in Azure SQL DBO schema takes a few minutes. After initial loads, it's recommended to only load incremental data, to keep the workload of our ODBC/JDBC connector relatively small. When the data volumn reached a certain height, full table copy from Azure SQL to Redshift using our JDBC connector may take too much time to be viable. For the details of the migration, please check [src/ingest](src/ingest).
+**TASTG**: Staging tables are created in this schema. When tables are migrated from Azure SQL to Redshift, mirroring tables are created in TASTG and all data transfered. Some nvarhcar and text columns are truncated to size 1000 to moderately reduced data size. Binary columns are not supported in Redshift, thus not migrated. There are two types of data load on staging tables, intial load and incremental load. In this project, data is loaded as inital load, which means full table copy. Under current condition(06/19/2017) with relatively small data size, intial load from all tables in Azure SQL DBO schema takes a few minutes. After initial loads, it's recommended to only load incremental data, to keep the workload of our ODBC/JDBC connector relatively small. When the data volumn reached a certain height, full table copy from Azure SQL to Redshift using our JDBC connector may take too much time to be viable.
 
-**TADW**: Data warehouse tables are included int his schema. Tables in TADW are slightly denormalized to reduce he amount of joins. Typically, program_id and calendar_season_id are added to a few tables. In Redshift, primary key and foreign key are not enforced, but only for the purpose of schema design. DDLs of TADW table can be found in [src/sql/ddl/ta_dw_ddl.sql](src/sql/ddl/ta_dw_ddl.sql). Some insert statements that load data from TASTG to TADW can be found in [src/sql/dml/stg_to_dw.sql]. There are 3 new tables created in TADW: specialty_dim, audit_operation_dim and interview_status_dim, with simple id & name structures. Insert statements of these tables are included in [src/sql/dml](src/sql/dml). An ER diagram for TADW is placed in [docs/images](docs/images)
+**TADW**: Data warehouse tables are included int his schema. Tables in TADW are slightly denormalized to reduce he amount of joins. Typically, program_id and calendar_season_id are added to a few tables. In Redshift, primary key and foreign key are not enforced, but only for the purpose of schema design.
 
-**TARPT**: Report tables are create in this schema. Complex logic that generates report tables is implemented in Spark (PySpark and DataFrame). DDLs for createing report tables are collected in [src/sql/ddl/ta_rpt_ddl.sql]
+**TARPT**: Report tables are create in this schema. Complex logic that generates report tables is implemented in Spark (PySpark and DataFrame).
 
 ### Spark (ETL)
 Spark is used to handle the ETL process on Redshift data. Spark scripts are written with [PySpark DataFrame](http://spark.apache.org/docs/2.1.0/api/python/pyspark.sql.html) which represents Spark RDD operation in a SQL-like fashion.  
 
 ### Data Visualization and RestAPI
-Data Visualization is achieved by [Amazon QuickSight](README.md###Amazon-QuickSight). 
+Data Visualization is achieved by [redash.io](https://redash.io/) and [Amazon QuickSight](README.md###Amazon-QuickSight). 
 Restful API is generated by [flask-restful](README.md###Flask)
 
 
