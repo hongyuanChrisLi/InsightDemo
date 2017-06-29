@@ -2,7 +2,7 @@
 
 Thalamus Analytics is my consulting project in Insight Data Science for ThalamusGME.
 
-***Note: This public reposiotry only contains a few source code samples. These code snippets highlight the use of pyspark dataframe. You can find them in [src/etl](src/etl) and [src/cnx](src/cnx) directories***
+***Note: This public repository only contains a few source code samples. These code snippets highlight the use of pyspark dataframe. You can find them in [src/etl](src/etl) and [src/cnx](src/cnx) directories***
 
 * [1. Data Pipeline](README.md#Data-Pipeline)
 * [2. System Setup and Configuration](README.md#System-Setup-and-Configuration)
@@ -16,7 +16,7 @@ Thalamus Analytics is my consulting project in Insight Data Science for Thalamus
 
 The data pipeline starts with Azure SQL server database, where ThalamusGME's operational data resides. A light weight ODBC/JDBC connector (single node & serial) in this project transfer data from Azure SQL server to Amazon Redshift, our data warehouse. In Redshift, there are three schemas TASTG, TADW, and TARPT: 
 
-**TASTG**: Staging tables are created in this schema. When tables are migrated from Azure SQL to Redshift, mirroring tables are created in TASTG and all data transfered. Some nvarhcar and text columns are truncated to size 1000 to moderately reduced data size. Binary columns are not supported in Redshift, thus not migrated. There are two types of data load on staging tables, intial load and incremental load. In this project, data is loaded as inital load, which means full table copy. Under current condition(06/19/2017) with relatively small data size, intial load from all tables in Azure SQL DBO schema takes a few minutes. After initial loads, it's recommended to only load incremental data, to keep the workload of our ODBC/JDBC connector relatively small. When the data volumn reached a certain height, full table copy from Azure SQL to Redshift using our JDBC connector may take too much time to be viable.
+**TASTG**: Staging tables are created in this schema. When tables are migrated from Azure SQL to Redshift, mirroring tables are created in TASTG and all data transferred. Some nvarhcar and text columns are truncated to size 1000 to moderately reduced data size. Binary columns are not supported in Redshift, thus not migrated. There are two types of data load on staging tables, initial load and incremental load. In this project, data is loaded as initial load, which means full table copy. Under current condition(06/19/2017) with relatively small data size, initial load from all tables in Azure SQL DBO schema takes a few minutes. After initial loads, it's recommended to only load incremental data, to keep the workload of our ODBC/JDBC connector relatively small. When the data volume reached a certain height, full table copy from Azure SQL to Redshift using our JDBC connector may take too much time to be viable.
 
 **TADW**: Data warehouse tables are included int his schema. Tables in TADW are slightly denormalized to reduce he amount of joins. Typically, program_id and calendar_season_id are added to a few tables. In Redshift, primary key and foreign key are not enforced, but only for the purpose of schema design.
 
@@ -38,11 +38,11 @@ Install pyhton 2.7 on your machine. https://www.python.org/downloads/
 ### AWS Stack
 Here's a list of services needed for infrastructure: 
 
-**Redshift**: [Distributed colunmer database](http://docs.aws.amazon.com/redshift/latest/gsg/getting-started.html). 
+**Redshift**: [Distributed columnar database](http://docs.aws.amazon.com/redshift/latest/gsg/getting-started.html). 
 
 **EC2**: cloud servers used to build Spark cluster, using Pegasus (see [Pegasus & Spark](README.md###Pegasus-&-Spark) )
 
-**S3**: Needed by [Spark-Redshift](README.md###Spark-Redshift) to store tempoary data files. 
+**S3**: Needed by [Spark-Redshift](README.md###Spark-Redshift) to store temporary data files. 
   
 **VPC**: Network Security
 
@@ -50,7 +50,7 @@ Here's a list of services needed for infrastructure:
 
 
 ### Azure SQL ODBC
-Following the instrunction on [Azure web site](https://docs.microsoft.com/en-us/azure/sql-database/sql-database-connect-query-python)
+Following the instructions on [Azure web site](https://docs.microsoft.com/en-us/azure/sql-database/sql-database-connect-query-python)
 
 Linux / Unix Users: 
 
@@ -83,7 +83,7 @@ $ git clone https://github.com/InsightDataScience/pegasus.git
 $ pip install awscli
 ```
 ### Spark-Redshift(DataBricks)
-[Spark-Redshift connector](https://github.com/databricks/spark-redshift), an open source product by DataBricks, is used to connect Spark cluster and Redshift database. The jar package RedshiftJDBC42-1.2.1.1001.jar has already been inclued in [jars](jars/RedshiftJDBC42-1.2.1.1001.jar), so there's no configuration needed
+[Spark-Redshift connector](https://github.com/databricks/spark-redshift), an open source product by DataBricks, is used to connect Spark cluster and Redshift database. The jar package RedshiftJDBC42-1.2.1.1001.jar has already been included in [jars](jars/RedshiftJDBC42-1.2.1.1001.jar), so there's no configuration needed
 
 ### Flask
 We use [Flask to generate Restful APIs.](https://flask-restful.readthedocs.io/)
